@@ -18,6 +18,16 @@ func main() {
 		port = "8080"
 	}
 
+	r := setupRouter()
+
+	log.Printf("Server starting on port %s", port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
+}
+
+// setupRouter configures and returns the Gin router
+func setupRouter() *gin.Engine {
 	r := gin.Default()
 
 	// CORS middleware
@@ -100,10 +110,7 @@ func main() {
 		})
 	}
 
-	log.Printf("Server starting on port %s", port)
-	if err := r.Run(":" + port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
+	return r
 }
 
 func getContentType(path string) string {

@@ -1,8 +1,15 @@
 package service
 
 import (
+	"embed"
+	"encoding/json"
+	"log"
+	"sync"
 	"time"
 )
+
+//go:embed holidays.json
+var holidaysData embed.FS
 
 // HolidayInfo represents holiday information
 type HolidayInfo struct {
@@ -12,99 +19,56 @@ type HolidayInfo struct {
 	Type      string // "holiday", "workday", or "weekend"
 }
 
-// Chinese holidays data for 2024-2026
-// In production, this should be loaded from a database or API
-var chineseHolidays = map[string]HolidayInfo{
-	// 2024
-	"2024-01-01": {IsHoliday: true, IsWorkday: false, Name: "元旦", Type: "holiday"},
-	"2024-02-10": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2024-02-11": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2024-02-12": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2024-02-13": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2024-02-14": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2024-02-15": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2024-02-16": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2024-02-17": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2024-04-04": {IsHoliday: true, IsWorkday: false, Name: "清明节", Type: "holiday"},
-	"2024-04-05": {IsHoliday: true, IsWorkday: false, Name: "清明节", Type: "holiday"},
-	"2024-04-06": {IsHoliday: true, IsWorkday: false, Name: "清明节", Type: "holiday"},
-	"2024-05-01": {IsHoliday: true, IsWorkday: false, Name: "劳动节", Type: "holiday"},
-	"2024-05-02": {IsHoliday: true, IsWorkday: false, Name: "劳动节", Type: "holiday"},
-	"2024-05-03": {IsHoliday: true, IsWorkday: false, Name: "劳动节", Type: "holiday"},
-	"2024-05-04": {IsHoliday: true, IsWorkday: false, Name: "劳动节", Type: "holiday"},
-	"2024-05-05": {IsHoliday: true, IsWorkday: false, Name: "劳动节", Type: "holiday"},
-	"2024-06-10": {IsHoliday: true, IsWorkday: false, Name: "端午节", Type: "holiday"},
-	"2024-09-15": {IsHoliday: true, IsWorkday: false, Name: "中秋节", Type: "holiday"},
-	"2024-09-16": {IsHoliday: true, IsWorkday: false, Name: "中秋节", Type: "holiday"},
-	"2024-09-17": {IsHoliday: true, IsWorkday: false, Name: "中秋节", Type: "holiday"},
-	"2024-10-01": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2024-10-02": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2024-10-03": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2024-10-04": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2024-10-05": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2024-10-06": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2024-10-07": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	// Compensatory workdays
-	"2024-02-04": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
-	"2024-02-18": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
-	"2024-04-07": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
-	"2024-04-28": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
-	"2024-09-14": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
-	"2024-09-29": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
-	"2024-10-12": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
+// HolidayNote represents the JSON structure of holiday data
+type HolidayNote struct {
+	Note string `json:"note"`
+}
 
-	// 2025
-	"2025-01-01": {IsHoliday: true, IsWorkday: false, Name: "元旦", Type: "holiday"},
-	"2025-01-28": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2025-01-29": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2025-01-30": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2025-01-31": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2025-02-01": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2025-02-02": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2025-02-03": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2025-02-04": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2025-04-04": {IsHoliday: true, IsWorkday: false, Name: "清明节", Type: "holiday"},
-	"2025-04-05": {IsHoliday: true, IsWorkday: false, Name: "清明节", Type: "holiday"},
-	"2025-04-06": {IsHoliday: true, IsWorkday: false, Name: "清明节", Type: "holiday"},
-	"2025-05-01": {IsHoliday: true, IsWorkday: false, Name: "劳动节", Type: "holiday"},
-	"2025-05-02": {IsHoliday: true, IsWorkday: false, Name: "劳动节", Type: "holiday"},
-	"2025-05-03": {IsHoliday: true, IsWorkday: false, Name: "劳动节", Type: "holiday"},
-	"2025-05-31": {IsHoliday: true, IsWorkday: false, Name: "端午节", Type: "holiday"},
-	"2025-06-01": {IsHoliday: true, IsWorkday: false, Name: "端午节", Type: "holiday"},
-	"2025-06-02": {IsHoliday: true, IsWorkday: false, Name: "端午节", Type: "holiday"},
-	"2025-10-01": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2025-10-02": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2025-10-03": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2025-10-04": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2025-10-05": {IsHoliday: true, IsWorkday: false, Name: "国庆节", Type: "holiday"},
-	"2025-10-06": {IsHoliday: true, IsWorkday: false, Name: "中秋节", Type: "holiday"},
-	"2025-10-07": {IsHoliday: true, IsWorkday: false, Name: "中秋节", Type: "holiday"},
-	"2025-10-08": {IsHoliday: true, IsWorkday: false, Name: "中秋节", Type: "holiday"},
-	// Compensatory workdays
-	"2025-01-26": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
-	"2025-02-08": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
-	"2025-09-28": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
-	"2025-10-11": {IsHoliday: false, IsWorkday: true, Name: "补班", Type: "workday"},
+var (
+	chineseHolidays map[string]HolidayNote
+	holidayOnce     sync.Once
+)
 
-	// 2026
-	"2026-01-01": {IsHoliday: true, IsWorkday: false, Name: "元旦", Type: "holiday"},
-	"2026-01-02": {IsHoliday: true, IsWorkday: false, Name: "元旦", Type: "holiday"},
-	"2026-01-03": {IsHoliday: true, IsWorkday: false, Name: "元旦", Type: "holiday"},
-	"2026-02-16": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2026-02-17": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2026-02-18": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2026-02-19": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2026-02-20": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2026-02-21": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2026-02-22": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
-	"2026-02-23": {IsHoliday: true, IsWorkday: false, Name: "春节", Type: "holiday"},
+// loadHolidays loads holiday data from embedded JSON file
+func loadHolidays() {
+	holidayOnce.Do(func() {
+		data, err := holidaysData.ReadFile("holidays.json")
+		if err != nil {
+			log.Printf("Warning: Failed to load holidays data: %v", err)
+			chineseHolidays = make(map[string]HolidayNote)
+			return
+		}
+
+		if err := json.Unmarshal(data, &chineseHolidays); err != nil {
+			log.Printf("Warning: Failed to parse holidays data: %v", err)
+			chineseHolidays = make(map[string]HolidayNote)
+			return
+		}
+	})
 }
 
 // GetHolidayInfo returns holiday information for a given date
 func GetHolidayInfo(date string) HolidayInfo {
+	loadHolidays()
+
 	// Check if date is in holidays map
-	if info, exists := chineseHolidays[date]; exists {
-		return info
+	if note, exists := chineseHolidays[date]; exists {
+		// Check if it's a compensatory workday (补班)
+		if note.Note == "补班" {
+			return HolidayInfo{
+				IsHoliday: false,
+				IsWorkday: true,
+				Name:      note.Note,
+				Type:      "workday",
+			}
+		}
+		// It's a holiday
+		return HolidayInfo{
+			IsHoliday: true,
+			IsWorkday: false,
+			Name:      note.Note,
+			Type:      "holiday",
+		}
 	}
 
 	// Parse date to check if it's a weekend

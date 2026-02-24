@@ -32,6 +32,35 @@ func TestMainDefaultPort(t *testing.T) {
 	}
 }
 
+func TestGetContentType(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected string
+	}{
+		{"index.html", "text/html; charset=utf-8"},
+		{"script.js", "application/javascript"},
+		{"style.css", "text/css"},
+		{"data.json", "application/json"},
+		{"image.png", "image/png"},
+		{"photo.jpg", "image/jpeg"},
+		{"photo.jpeg", "image/jpeg"},
+		{"icon.svg", "image/svg+xml"},
+		{"font.woff", "font/woff"},
+		{"font.woff2", "font/woff2"},
+		{"unknown.xyz", "application/octet-stream"},
+		{"", "application/octet-stream"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got := getContentType(tt.path)
+			if got != tt.expected {
+				t.Errorf("getContentType(%q) = %q, want %q", tt.path, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestMain(m *testing.M) {
 	// Run tests
 	code := m.Run()
