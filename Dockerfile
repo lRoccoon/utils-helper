@@ -4,7 +4,7 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 COPY frontend/ ./
 RUN npm run build
@@ -28,9 +28,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /server ./cmd/server
 
 # Stage 3: Final minimal image
 FROM alpine:latest
-
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 

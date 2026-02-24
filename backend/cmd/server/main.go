@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -45,36 +44,38 @@ func main() {
 	} else {
 		// Serve static files with fallback to index.html for SPA routing
 		r.NoRoute(func(c *gin.Context) {
-			path := c.Request.URL.Path
+			path := strings.TrimPrefix(c.Request.URL.Path, "/")
 
 			// Skip if it's an API route
-			if strings.HasPrefix(path, "/api/") {
+			if strings.HasPrefix(c.Request.URL.Path, "/api/") {
 				c.JSON(http.StatusNotFound, gin.H{"error": "API endpoint not found"})
 				return
 			}
 
-			// Try to serve the file
-			if _, err := fs.Stat(staticFS, strings.TrimPrefix(path, "/")); err == nil {
+			// Try to serve the exact file
+			if path == "" {
+				path = "index.html"
+			}
+
+			if _, err := fs.Stat(staticFS, path); err == nil {
 				c.FileFromFS(path, http.FS(staticFS))
 				return
 			}
 
-			// Try with .html extension
-			htmlPath := strings.TrimPrefix(path, "/") + ".html"
-			if _, err := fs.Stat(staticFS, htmlPath); err == nil {
-				c.FileFromFS("/"+htmlPath, http.FS(staticFS))
+			// Try path + .html
+			if _, err := fs.Stat(staticFS, path+".html"); err == nil {
+				c.FileFromFS(path+".html", http.FS(staticFS))
 				return
 			}
 
-			// Try as directory with index.html
-			indexPath := filepath.Join(strings.TrimPrefix(path, "/"), "index.html")
-			if _, err := fs.Stat(staticFS, indexPath); err == nil {
-				c.FileFromFS("/"+indexPath, http.FS(staticFS))
+			// Try path + /index.html
+			if _, err := fs.Stat(staticFS, path+"/index.html"); err == nil {
+				c.FileFromFS(path+"/index.html", http.FS(staticFS))
 				return
 			}
 
 			// Fallback to root index.html for SPA routing
-			c.FileFromFS("/index.html", http.FS(staticFS))
+			c.FileFromFS("index.html", http.FS(staticFS))
 		})
 	}
 
