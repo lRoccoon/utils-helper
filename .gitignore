@@ -8,6 +8,11 @@ build/
 .next/
 out/
 
+# Exception: Keep the static dist directory structure for Go embed
+!backend/internal/static/dist/
+backend/internal/static/dist/*
+!backend/internal/static/dist/.gitkeep
+
 # Go binaries
 *.exe
 *.exe~
