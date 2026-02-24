@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/fs"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -42,40 +42,61 @@ func main() {
 	if err != nil {
 		log.Printf("Warning: Failed to load embedded static files: %v", err)
 	} else {
-		// Serve static files with fallback to index.html for SPA routing
+		// Handle all routes for SPA
 		r.NoRoute(func(c *gin.Context) {
-			path := strings.TrimPrefix(c.Request.URL.Path, "/")
+			path := c.Request.URL.Path
 
 			// Skip if it's an API route
-			if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			if strings.HasPrefix(path, "/api/") {
 				c.JSON(http.StatusNotFound, gin.H{"error": "API endpoint not found"})
 				return
 			}
 
-			// Try to serve the exact file
+			// Serve static files
+			path = strings.TrimPrefix(path, "/")
 			if path == "" {
 				path = "index.html"
 			}
 
-			if _, err := fs.Stat(staticFS, path); err == nil {
-				c.FileFromFS(path, http.FS(staticFS))
+			// Try to read the file from embedded FS
+			data, err := staticFS.Open(path)
+			if err == nil {
+				defer data.Close()
+				stat, _ := data.Stat()
+				if !stat.IsDir() {
+					content, _ := io.ReadAll(data)
+					c.Data(http.StatusOK, getContentType(path), content)
+					return
+				}
+			}
+
+			// Try with .html extension
+			data, err = staticFS.Open(path + ".html")
+			if err == nil {
+				defer data.Close()
+				content, _ := io.ReadAll(data)
+				c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 				return
 			}
 
-			// Try path + .html
-			if _, err := fs.Stat(staticFS, path+".html"); err == nil {
-				c.FileFromFS(path+".html", http.FS(staticFS))
-				return
-			}
-
-			// Try path + /index.html
-			if _, err := fs.Stat(staticFS, path+"/index.html"); err == nil {
-				c.FileFromFS(path+"/index.html", http.FS(staticFS))
+			// Try index.html in subdirectory
+			data, err = staticFS.Open(path + "/index.html")
+			if err == nil {
+				defer data.Close()
+				content, _ := io.ReadAll(data)
+				c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 				return
 			}
 
 			// Fallback to root index.html for SPA routing
-			c.FileFromFS("index.html", http.FS(staticFS))
+			data, err = staticFS.Open("index.html")
+			if err == nil {
+				defer data.Close()
+				content, _ := io.ReadAll(data)
+				c.Data(http.StatusOK, "text/html; charset=utf-8", content)
+			} else {
+				c.String(http.StatusNotFound, "404 page not found")
+			}
 		})
 	}
 
@@ -83,4 +104,35 @@ func main() {
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func getContentType(path string) string {
+	if strings.HasSuffix(path, ".html") {
+		return "text/html; charset=utf-8"
+	}
+	if strings.HasSuffix(path, ".js") {
+		return "application/javascript"
+	}
+	if strings.HasSuffix(path, ".css") {
+		return "text/css"
+	}
+	if strings.HasSuffix(path, ".json") {
+		return "application/json"
+	}
+	if strings.HasSuffix(path, ".png") {
+		return "image/png"
+	}
+	if strings.HasSuffix(path, ".jpg") || strings.HasSuffix(path, ".jpeg") {
+		return "image/jpeg"
+	}
+	if strings.HasSuffix(path, ".svg") {
+		return "image/svg+xml"
+	}
+	if strings.HasSuffix(path, ".woff") {
+		return "font/woff"
+	}
+	if strings.HasSuffix(path, ".woff2") {
+		return "font/woff2"
+	}
+	return "application/octet-stream"
 }
